@@ -1,0 +1,26 @@
+
+{{ if not .Values.credentials.postgres.system.external }}
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: i3dhub-license-postgres-pvc
+  labels:
+    app: i3dhub-license-postgres
+    instance: {{ .Release.Namespace }}
+spec:
+  storageClassName: {{ .Values.storage.class }}
+{{- if eq .Values.storage.selectBy "selector" }}
+  selector:
+    matchLabels:
+      app: i3dhub-license-postgres
+      instance: {{ .Release.Namespace }}
+{{- end }}
+  accessModes:
+    -  {{ .Values.storage.accessModes | default "ReadWriteMany" }}
+  resources:
+    requests:
+      storage: {{ div .Values.volumeSize 4 }}Gi
+
+{{ end }}
+

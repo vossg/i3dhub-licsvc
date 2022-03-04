@@ -1,0 +1,16 @@
+
+# Source: instant3Dhub/templates/configs.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: i3dhub-config-service
+data:
+  instant3DhubLicenseServer: |-    
+    echo "configure license server"
+    export LSERVER_LOG_FILE=""
+
+    export PGPORT=5432
+    export PGHOST=localhost
+
+  license.xml: |-
+{{ .Files.Get "license.xml" | indent 8 }}

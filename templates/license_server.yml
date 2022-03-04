@@ -1,0 +1,134 @@
+{{ if not .Values.credentials.postgres.system.external }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: i3dhub-license-postgres-config
+  labels:
+    app: i3dhub-license-server
+data:
+  POSTGRES_USER:     i3dhub
+  POSTGRES_PASSWORD: 12and3
+  
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: i3dhub-license-server
+spec:
+  selector:
+    matchLabels:
+      app: i3dhub-license-server
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: i3dhub-license-server
+    spec:
+{{- if .Values.serviceAccount }}
+      serviceAccount:     {{ .Values.serviceAccount }}
+      serviceAccountName: {{ .Values.serviceAccount }}
+{{- end }}
+{{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+{{- end }}
+      containers:
+        - name: i3dhub-license-postgres
+          image: {{ if .Values.registry }}{{ .Values.registry }}/{{ end }}i3dhub-license-postgres:{{ .Values.imageTag }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+{{- if not .Values.resourceLimits.ignore }}
+          resources:
+            requests:
+              memory: "3000Mi"
+              cpu: "0.5"
+            limits:
+              memory: "3000Mi"
+              cpu: "4.0"
+{{- end }}
+          ports:
+            - containerPort: 5432 #TODO
+          envFrom:
+            - configMapRef:
+                name: i3dhub-license-postgres-config
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: i3dhub-elastic:9200
+            - name: PGDATA
+              value: {{ .Values.postgresStoragePath }}
+          volumeMounts:
+            - mountPath: {{ .Values.postgresStoragePath }}
+              name: i3dhub-license-postgres-storage
+              subPath: {{.Release.Name}}
+{{- if .Values.securityContext.enabled }}
+          securityContext:
+            fsGroup   : {{ .Values.securityContext.postgresFsGroup | default 10999 }}
+            runAsUser : {{ .Values.securityContext.postgresUser    | default 10999 }}
+            runAsGroup: {{ .Values.securityContext.postgresUser    | default 10999 }}
+{{- end }}
+
+        - name: i3dhub-license-svc
+          image: {{ if .Values.registry }}{{ .Values.registry }}/{{ end }}i3dhub-license-server:{{ .Values.imageTag }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+{{- if not .Values.resourceLimits.ignore }}
+          resources:
+            requests:
+              memory: "3000Mi"
+              cpu: "0.5"
+            limits:
+              memory: "3000Mi"
+              cpu: "4.0"
+{{- end }}
+          ports:
+            - containerPort: 8200 #TODO
+
+          env:
+            - name: ELASTICSEARCH_HOSTS
+              value: i3dhub-elastic:9200
+
+          volumeMounts:
+            - name: i3dhub-config-service
+              mountPath: /opt/instant3Dhub.custom
+
+#          securityContext:
+#            runAsUser : {{ .Values.securityContext.licenseUser    | default 10999 }}
+#            runAsGroup: {{ .Values.securityContext.licenseUser    | default 10999 }}
+
+{{ if .Values.securityContext.enabled }}
+      initContainers:
+        - name: i3dhub-init-license-postgres-permissions
+          image: alpine:3.8
+          command: ['sh', '-c', "ls -lahn /var/lib/postgresql/ && chown -R {{ .Values.securityContext.postgresUser }}.{{ .Values.securityContext.postgresUser }} {{ .Values.postgresStoragePath }} && ls -lahn /var/lib/postgresql/"]
+          volumeMounts:
+            - mountPath: {{ .Values.postgresStoragePath }}
+              name: i3dhub-license-postgres-storage
+              subPath: {{.Release.Name}}
+{{ end }}
+      volumes:
+        - name: i3dhub-license-postgres-storage
+          persistentVolumeClaim:
+            claimName: i3dhub-license-postgres-pvc
+        - name: i3dhub-config-service
+          configMap:
+            name: i3dhub-config-service
+      nodeSelector:
+{{ toYaml .Values.nodeSelector | indent 8 }}
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: i3dhub-license-server
+  labels:
+    app: i3dhub-license-server
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8200
+      targetPort: 8200
+  selector:
+    app: i3dhub-license-server
+
+{{ end }}

@@ -1,0 +1,67 @@
+# Default values for helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+################################################################################
+# Section 1 - These values must be set
+################################################################################
+
+# Set this to the image registry. Set without a protocol.
+# f.e. nexus.threedy.io:8082
+registry: images.threedy.io
+
+################################################################################
+# Section 2 - These values usually don't need to be changed
+################################################################################
+
+# Set the storage class to enable mapping of PersistentVolumeClaims with the 
+# provided storage
+storage:
+  class: manual
+  selectBy: selector 
+
+# Change this when using a push distribution
+imagePullPolicy: Always
+
+# run pods/containers as given user/fsGroup 
+#
+#  - postgresUser/FsGroup, for internal postgres and pgbouncer, do not change
+#
+securityContext:
+  enabled        : false
+
+  postgresFsGroup: 10999
+  postgresUser   : 10999
+  licenseFsGroup : 10999
+  licenseUser    : 10999
+
+# Resource limits and requests, enabled by default
+# If ignored all containers will have start without any values set.
+# However if necessary certain containers which might need more resources depending on the input data can be configured individually below 
+resourceLimits: 
+  ignore: true
+
+# Credentials for system components. Only change these if running an external PostgreSQL or RabbitMQ instance.
+# If provided, secretKeyRef values are preferred over the direct values given.
+credentials:
+  postgres:
+    system:
+      # see https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING for format
+      # secret to use which contains the connectionString data. 
+      # see https://kubernetes.io/docs/tasks/inject-data-application/distribute-credentials-secure/#define-container-environment-variables-using-secret-data
+      external: false
+      secretKeyRef:
+        name: i3dhub-default-secrets
+        key: pgConnStr
+
+# This is the version name and the tag for the instant3Dhub images
+imageTag: "22.3"
+
+# The internal postgres storage path. Only adjust this if you have permission
+# issues during container start. 
+postgresStoragePath: /var/lib/postgresql/data
+
+volumeSize: 5
+
+nodeSelector:
+  licenseServer: assignable
